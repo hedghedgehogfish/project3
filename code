@@ -1,0 +1,115 @@
+import telebot
+import time
+import threading
+
+token = '8867445771:AAHtTsxsODffFxYVzG7EV_5Yr1EO0EP90MI'
+
+bot = telebot.TeleBot(token)
+
+user_data = {}
+
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+
+    user_data[user_id] = {'water_intake': 0, 'reminder_interval': 60}
+
+    bot.send_message(user_id, "Привет! 💧\n"
+                     "Я буду напоминать тебе пить воду каждые 60 минут.\n\n"
+                     "Чтобы изменить интервал:\n"
+                     "/set_interval <минуты>")
+
+    bot.send_message(user_id, "Доступные команды:\n"
+                     "/set_interval — изменить интервал\n"
+                     "/water_intake — посмотреть количество воды\n"
+                     "/add_water — добавить выпитую воду\n"
+                     "/reset — сбросить воду")
+
+
+@bot.message_handler(commands=['set_interval'])
+def set_interval(message):
+    user_id = message.from_user.id
+
+    if user_id not in user_data:
+        user_data[user_id] = {'water_intake': 0, 'reminder_interval': 60}
+
+    try:
+        interval = int(message.text.split()[1])
+
+        if interval <= 0:
+            bot.send_message(user_id, "Интервал должен быть больше 0 минут.")
+            return
+
+        user_data[user_id]['reminder_interval'] = interval
+
+        bot.send_message(user_id, f"✅ Интервал напоминаний изменён на {interval} минут.")
+
+    except (IndexError, ValueError):
+        bot.send_message(user_id, "Используй так:\n/set_interval 30")
+
+
+@bot.message_handler(commands=['water_intake'])
+def water_intake(message):
+    user_id = message.from_user.id
+
+    if user_id not in user_data:
+        user_data[user_id] = {'water_intake': 0, 'reminder_interval': 60}
+
+    intake = user_data[user_id]['water_intake']
+
+    bot.send_message(user_id, f"💧 Сегодня выпито: {intake} мл.")
+
+
+@bot.message_handler(commands=['add_water'])
+def add_water(message):
+    user_id = message.from_user.id
+
+    try:
+        amount = int(message.text.split()[1])
+
+        if amount <= 0:
+            bot.send_message(user_id, "Количество воды должно быть больше 0.")
+            return
+
+        user_data[user_id]['water_intake'] += amount
+
+        total = user_data[user_id]['water_intake']
+
+        bot.send_message(user_id, f"💧 Добавлено {amount} мл.\n"f"Всего сегодня: {total} мл.")
+
+    except (IndexError, ValueError):
+        bot.send_message(user_id, "Используй так:\n/add_water 250")
+
+
+@bot.message_handler(commands=['reset'])
+def reset(message):
+    user_id = message.from_user.id
+
+    if user_id not in user_data:
+        user_data[user_id] = {'water_intake': 0, 'reminder_interval': 60}
+
+    user_data[user_id]['water_intake'] = 0
+
+    bot.send_message(user_id, "🔄 Потребление воды сброшено.")
+
+
+def send_reminders():
+    while True:
+
+        for user_id, data in list(user_data.items()):
+
+            try:
+                bot.send_message(user_id, "💧 Пора попить воды!")
+
+            except Exception as e:
+                print(f"Ошибка отправки пользователю {user_id}: {e}")
+
+        time.sleep(60)
+
+
+reminder_thread = threading.Thread(target=send_reminders, daemon=True)
+
+reminder_thread.start()
+
+bot.infinity_polling()
